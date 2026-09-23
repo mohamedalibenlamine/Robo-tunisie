@@ -73,7 +73,7 @@ def init_db():
         # Table documents
         c.execute('''CREATE TABLE IF NOT EXISTS documents (
             id BIGSERIAL PRIMARY KEY,
-            competition_id INTEGER NOT NULL,
+            competition_id BIGINT NOT NULL,
             title TEXT NOT NULL,
             file_path TEXT NOT NULL,
             file_type TEXT,
