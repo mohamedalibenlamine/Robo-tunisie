@@ -4,13 +4,19 @@ Script pour ajouter des données de test à ROBO TUNISIE
 Utile pour voir comment fonctionne le site avant de créer vos propres compétitions
 """
 
-import sqlite3
+import psycopg
+from psycopg.rows import tuple_row
+from psycopg import IntegrityError
+import os
 from werkzeug.security import generate_password_hash
 
 def seed_database():
     """Ajoute des données de test à la base de données"""
     
-    conn = sqlite3.connect('robo_tunisie.db')
+    database_url = os.environ.get('DATABASE_URL')
+    if not database_url:
+        raise RuntimeError('DATABASE_URL environment variable is required')
+    conn = psycopg.connect(database_url, row_factory=tuple_row)
     c = conn.cursor()
     
     # Clubs de test
@@ -29,10 +35,10 @@ def seed_database():
             # Hash du mot de passe
             hashed_pwd = generate_password_hash(club[2])
             c.execute('''INSERT INTO clubs (name, email, password, phone, city, facebook, instagram, linkedin)
-                        VALUES (?, ?, ?, ?, ?, ?, ?, ?)''',
+                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s)''',
                      (club[0], club[1], hashed_pwd, club[3], club[4], club[5], club[6], club[7]))
             print(f"  ✓ {club[0]}")
-        except sqlite3.IntegrityError:
+        except IntegrityError:
             print(f"  ⚠️  {club[0]} déjà existe")
     
     conn.commit()
@@ -40,7 +46,7 @@ def seed_database():
     # Récupérer les IDs des clubs
     clubs = {}
     for club_name in [c[0] for c in clubs_data]:
-        result = c.execute('SELECT id FROM clubs WHERE name = ?', (club_name,)).fetchone()
+        result = c.execute('SELECT id FROM clubs WHERE name = %s', (club_name,)).fetchone()
         if result:
             clubs[club_name] = result[0]
     
@@ -83,7 +89,7 @@ def seed_database():
         try:
             c.execute('''INSERT INTO competitions 
                         (club_id, name, date, location, description, challenges, max_participants, registration_deadline, contact_email, contact_phone)
-                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''', comp)
+                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)''', comp)
             comp_id = c.lastrowid
             competition_ids[comp[1]] = comp_id
             print(f"  ✓ {comp[1]}")
@@ -96,9 +102,9 @@ def seed_database():
     print("\n🌐 Ajout des réseaux sociaux...")
     for comp_name, comp_id in competition_ids.items():
         try:
-            c.execute('INSERT INTO social_links (competition_id, platform, url) VALUES (?, ?, ?)',
+            c.execute('INSERT INTO social_links (competition_id, platform, url) VALUES (%s, %s, %s)',
                      (comp_id, 'Facebook', f'https://facebook.com/{comp_name.replace(" ", "").lower()}'))
-            c.execute('INSERT INTO social_links (competition_id, platform, url) VALUES (?, ?, ?)',
+            c.execute('INSERT INTO social_links (competition_id, platform, url) VALUES (%s, %s, %s)',
                      (comp_id, 'Instagram', f'https://instagram.com/{comp_name.replace(" ", "_").lower()}'))
             print(f"  ✓ Réseaux pour {comp_name}")
         except:
