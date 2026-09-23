@@ -1,7 +1,9 @@
 from flask import Flask, render_template, request, jsonify, session, redirect, url_for, send_file
 from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import secure_filename
-import sqlite3
+import psycopg
+from psycopg.rows import dict_row
+from psycopg import IntegrityError
 import os
 from datetime import datetime
 from functools import wraps
@@ -15,7 +17,9 @@ os.makedirs('uploads', exist_ok=True)
 os.makedirs('instance', exist_ok=True)
 
 # Base de données
-DATABASE = 'robo_tunisie.db'
+DATABASE_URL = os.environ.get('DATABASE_URL')
+if not DATABASE_URL:
+    raise RuntimeError('DATABASE_URL environment variable is required for PostgreSQL')
 UPLOAD_FOLDER = 'uploads'
 ALLOWED_EXTENSIONS = {'pdf', 'doc', 'docx'}
 MAX_FILE_SIZE = 16 * 1024 * 1024
@@ -25,12 +29,8 @@ app.config['MAX_CONTENT_LENGTH'] = MAX_FILE_SIZE
 
 # ============ DATABASE ============
 def get_db():
-    """Connexion base de données"""
-    db = sqlite3.connect(DATABASE, timeout=15)
-    db.row_factory = sqlite3.Row
-    db.execute("PRAGMA journal_mode=WAL;")
-    db.execute("PRAGMA busy_timeout=15000;")
-    return db
+    """Connexion PostgreSQL"""
+    return psycopg.connect(DATABASE_URL, row_factory=dict_row, connect_timeout=15)
 
 def init_db():
     """Créer les tables si elles n'existent pas"""
@@ -40,7 +40,7 @@ def init_db():
         
         # Table clubs
         c.execute('''CREATE TABLE IF NOT EXISTS clubs (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            id BIGSERIAL PRIMARY KEY,
             name TEXT NOT NULL UNIQUE,
             email TEXT NOT NULL UNIQUE,
             password TEXT NOT NULL,
@@ -54,7 +54,7 @@ def init_db():
         
         # Table competitions
         c.execute('''CREATE TABLE IF NOT EXISTS competitions (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            id BIGSERIAL PRIMARY KEY,
             club_id INTEGER NOT NULL,
             name TEXT NOT NULL,
             date TEXT NOT NULL,
@@ -72,7 +72,7 @@ def init_db():
         
         # Table documents
         c.execute('''CREATE TABLE IF NOT EXISTS documents (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            id BIGSERIAL PRIMARY KEY,
             competition_id INTEGER NOT NULL,
             title TEXT NOT NULL,
             file_path TEXT NOT NULL,
@@ -83,7 +83,7 @@ def init_db():
         
         # Table social_links
         c.execute('''CREATE TABLE IF NOT EXISTS social_links (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            id BIGSERIAL PRIMARY KEY,
             competition_id INTEGER NOT NULL,
             platform TEXT NOT NULL,
             url TEXT NOT NULL,
@@ -127,7 +127,7 @@ def index():
         if search:
             c.execute("""SELECT id, name, date, location, description, club_id 
                         FROM competitions 
-                        WHERE name LIKE ? OR description LIKE ? OR location LIKE ?
+                        WHERE name LIKE %s OR description LIKE %s OR location LIKE %s
                         ORDER BY date DESC""", 
                      (f'%{search}%', f'%{search}%', f'%{search}%'))
         else:
@@ -138,7 +138,7 @@ def index():
         # Ajouter le nom du club
         competitions_with_club = []
         for comp in competitions:
-            c.execute("SELECT name FROM clubs WHERE id = ?", (comp['club_id'],))
+            c.execute("SELECT name FROM clubs WHERE id = %s", (comp['club_id'],))
             club = c.fetchone()
             competitions_with_club.append({
                 'id': comp['id'],
@@ -162,22 +162,22 @@ def competition_detail(comp_id):
         db = get_db()
         c = db.cursor()
         
-        c.execute("SELECT * FROM competitions WHERE id = ?", (comp_id,))
+        c.execute("SELECT * FROM competitions WHERE id = %s", (comp_id,))
         competition = c.fetchone()
         
         if not competition:
             return render_template('404.html'), 404
         
         # Info club
-        c.execute("SELECT name FROM clubs WHERE id = ?", (competition['club_id'],))
+        c.execute("SELECT name FROM clubs WHERE id = %s", (competition['club_id'],))
         club = c.fetchone()
         
         # Documents
-        c.execute("SELECT * FROM documents WHERE competition_id = ?", (comp_id,))
+        c.execute("SELECT * FROM documents WHERE competition_id = %s", (comp_id,))
         documents = c.fetchall()
         
         # Réseaux
-        c.execute("SELECT * FROM social_links WHERE competition_id = ?", (comp_id,))
+        c.execute("SELECT * FROM social_links WHERE competition_id = %s", (comp_id,))
         social_links = c.fetchall()
         
         db.close()
@@ -217,7 +217,7 @@ def club_login():
             
             db = get_db()
             c = db.cursor()
-            c.execute("SELECT * FROM clubs WHERE email = ?", (email,))
+            c.execute("SELECT * FROM clubs WHERE email = %s", (email,))
             club = c.fetchone()
             db.close()
             
@@ -252,19 +252,19 @@ def club_register():
             
             hashed_pw = generate_password_hash(password)
             c.execute("""INSERT INTO clubs (name, email, phone, city, password)
-                        VALUES (?, ?, ?, ?, ?)""",
+                        VALUES (%s, %s, %s, %s, %s)""",
                      (name, email, phone, city, hashed_pw))
             db.commit()
             
             # Auto-login
-            c.execute("SELECT id FROM clubs WHERE email = ?", (email,))
+            c.execute("SELECT id FROM clubs WHERE email = %s", (email,))
             club_id = c.fetchone()['id']
             session['club_id'] = club_id
             session['club_name'] = name
             
             db.close()
             return redirect(url_for('club_dashboard'))
-        except sqlite3.IntegrityError:
+        except IntegrityError:
             return render_template('club_register.html', error="Email ou nom déjà utilisé")
         except Exception as e:
             print(f"❌ Erreur register: {e}")
@@ -287,7 +287,7 @@ def club_dashboard():
         db = get_db()
         c = db.cursor()
         c.execute("""SELECT * FROM competitions 
-                    WHERE club_id = ? 
+                    WHERE club_id = %s 
                     ORDER BY created_at DESC""",
                  (session['club_id'],))
         competitions = c.fetchall()
@@ -322,12 +322,13 @@ def new_competition():
             c.execute("""INSERT INTO competitions 
                         (club_id, name, date, location, description, challenges, 
                          contact_email, contact_phone)
-                        VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
+                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                        RETURNING id""",
                      (session['club_id'], name, date, location, description, 
                       challenges, contact_email, contact_phone))
             db.commit()
             
-            comp_id = c.lastrowid
+            comp_id = c.fetchone()['id']
             db.close()
             
             return redirect(url_for('edit_competition', comp_id=comp_id))
@@ -346,7 +347,7 @@ def edit_competition(comp_id):
         c = db.cursor()
         
         c.execute("""SELECT * FROM competitions 
-                    WHERE id = ? AND club_id = ?""",
+                    WHERE id = %s AND club_id = %s""",
                  (comp_id, session['club_id']))
         competition = c.fetchone()
         
@@ -362,17 +363,17 @@ def edit_competition(comp_id):
             contact_phone = request.form.get('contact_phone', '').strip()
             
             c.execute("""UPDATE competitions 
-                        SET name=?, date=?, location=?, description=?, 
-                            contact_email=?, contact_phone=?
-                        WHERE id=? AND club_id=?""",
+                        SET name=%s, date=%s, location=%s, description=%s, 
+                            contact_email=%s, contact_phone=%s
+                        WHERE id=%s AND club_id=%s""",
                      (name, date, location, description, contact_email, 
                       contact_phone, comp_id, session['club_id']))
             db.commit()
         
-        c.execute("SELECT * FROM documents WHERE competition_id = ?", (comp_id,))
+        c.execute("SELECT * FROM documents WHERE competition_id = %s", (comp_id,))
         documents = c.fetchall()
         
-        c.execute("SELECT * FROM social_links WHERE competition_id = ?", (comp_id,))
+        c.execute("SELECT * FROM social_links WHERE competition_id = %s", (comp_id,))
         social_links = c.fetchall()
         
         db.close()
@@ -394,7 +395,7 @@ def upload_document(comp_id):
         db = get_db()
         c = db.cursor()
         
-        c.execute("SELECT club_id FROM competitions WHERE id = ?", (comp_id,))
+        c.execute("SELECT club_id FROM competitions WHERE id = %s", (comp_id,))
         competition = c.fetchone()
         
         if not competition or competition['club_id'] != session['club_id']:
@@ -418,7 +419,7 @@ def upload_document(comp_id):
         
         c.execute("""INSERT INTO documents 
                     (competition_id, title, file_path, file_type) 
-                    VALUES (?, ?, ?, ?)""",
+                    VALUES (%s, %s, %s, %s)""",
                  (comp_id, title, filename, filename.rsplit('.', 1)[1].lower()))
         db.commit()
         db.close()
@@ -438,7 +439,7 @@ def delete_document(doc_id):
         
         c.execute("""SELECT d.*, c.club_id FROM documents d 
                     JOIN competitions c ON d.competition_id = c.id 
-                    WHERE d.id = ?""", (doc_id,))
+                    WHERE d.id = %s""", (doc_id,))
         doc = c.fetchone()
         
         if not doc or doc['club_id'] != session['club_id']:
@@ -449,7 +450,7 @@ def delete_document(doc_id):
         if os.path.exists(file_path):
             os.remove(file_path)
         
-        c.execute("DELETE FROM documents WHERE id = ?", (doc_id,))
+        c.execute("DELETE FROM documents WHERE id = %s", (doc_id,))
         db.commit()
         db.close()
         
@@ -467,7 +468,7 @@ def add_social(comp_id):
         db = get_db()
         c = db.cursor()
         
-        c.execute("SELECT club_id FROM competitions WHERE id = ?", (comp_id,))
+        c.execute("SELECT club_id FROM competitions WHERE id = %s", (comp_id,))
         competition = c.fetchone()
         
         if not competition or competition['club_id'] != session['club_id']:
@@ -478,7 +479,7 @@ def add_social(comp_id):
         url = request.form.get('url', '').strip()
         
         c.execute("""INSERT INTO social_links (competition_id, platform, url) 
-                    VALUES (?, ?, ?)""",
+                    VALUES (%s, %s, %s)""",
                  (comp_id, platform, url))
         db.commit()
         db.close()
@@ -498,14 +499,14 @@ def delete_social(social_id):
         
         c.execute("""SELECT s.*, c.club_id FROM social_links s 
                     JOIN competitions c ON s.competition_id = c.id 
-                    WHERE s.id = ?""", (social_id,))
+                    WHERE s.id = %s""", (social_id,))
         social = c.fetchone()
         
         if not social or social['club_id'] != session['club_id']:
             db.close()
             return jsonify({'error': 'Unauthorized'}), 403
         
-        c.execute("DELETE FROM social_links WHERE id = ?", (social_id,))
+        c.execute("DELETE FROM social_links WHERE id = %s", (social_id,))
         db.commit()
         db.close()
         
