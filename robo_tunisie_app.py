@@ -55,7 +55,7 @@ def init_db():
         # Table competitions
         c.execute('''CREATE TABLE IF NOT EXISTS competitions (
             id BIGSERIAL PRIMARY KEY,
-            club_id INTEGER NOT NULL,
+            club_id BIGINT NOT NULL,
             name TEXT NOT NULL,
             date TEXT NOT NULL,
             location TEXT NOT NULL,
