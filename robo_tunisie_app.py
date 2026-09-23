@@ -18,7 +18,7 @@ app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max
 
 # Database initialization
 def init_db():
-    conn = sqlite3.connect('robo_tunisie.db')
+    conn = sqlite3.connect('/data/robo_tunisie.db')
     c = conn.cursor()
     
     # Table clubs
@@ -475,4 +475,5 @@ def server_error(error):
 
 if __name__ == '__main__':
     init_db()
-    app.run(debug=True, host='0.0.0.0', port=5000)
+    port = os.environ.get('PORT', 5000)
+    app.run(host='0.0.0.0', port=int(port), debug=False)
