@@ -26,8 +26,10 @@ app.config['MAX_CONTENT_LENGTH'] = MAX_FILE_SIZE
 # ============ DATABASE ============
 def get_db():
     """Connexion base de données"""
-    db = sqlite3.connect(DATABASE)
+    db = sqlite3.connect(DATABASE, timeout=15)
     db.row_factory = sqlite3.Row
+    db.execute("PRAGMA journal_mode=WAL;")
+    db.execute("PRAGMA busy_timeout=15000;")
     return db
 
 def init_db():
