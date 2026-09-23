@@ -90,10 +90,11 @@ def seed_database():
             c.execute('''INSERT INTO competitions 
                         (club_id, name, date, location, description, challenges, max_participants, registration_deadline, contact_email, contact_phone)
                         VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)''', comp)
-            comp_id = c.lastrowid
+            c.execute('SELECT id FROM competitions WHERE name = %s', (comp[1],))
+            comp_id = c.fetchone()[0]
             competition_ids[comp[1]] = comp_id
             print(f"  ✓ {comp[1]}")
-        except sqlite3.IntegrityError as e:
+        except IntegrityError as e:
             print(f"  ⚠️  {comp[1]} déjà existe")
     
     conn.commit()
