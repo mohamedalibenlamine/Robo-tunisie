@@ -1,0 +1,147 @@
+{% extends "base.html" %}
+
+{% block title %}Inscription Club - ROBO TUNISIE{% endblock %}
+
+{% block extra_css %}
+<style>
+    .auth-container {
+        max-width: 500px;
+        margin: 2rem auto;
+    }
+
+    .auth-card {
+        background: rgba(30, 41, 59, 0.6);
+        border: 1px solid var(--border-color);
+        border-radius: 1rem;
+        padding: 2rem;
+        backdrop-filter: blur(10px);
+    }
+
+    .auth-card h1 {
+        font-family: 'Playfair Display', serif;
+        font-size: 2rem;
+        margin-bottom: 0.5rem;
+        background: linear-gradient(135deg, #a78bfa 0%, #f472b6 100%);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+        text-align: center;
+    }
+
+    .auth-card p {
+        text-align: center;
+        color: var(--text-muted);
+        margin-bottom: 2rem;
+    }
+
+    .auth-link {
+        text-align: center;
+        margin-top: 1.5rem;
+        color: var(--text-muted);
+    }
+
+    .auth-link a {
+        color: var(--light-pink);
+        text-decoration: none;
+        font-weight: 600;
+        transition: color 0.3s;
+    }
+
+    .auth-link a:hover {
+        color: #f472b6;
+        text-decoration: underline;
+    }
+
+    .submit-btn {
+        width: 100%;
+        padding: 0.75rem;
+        background: linear-gradient(135deg, var(--accent-pink) 0%, #f472b6 100%);
+        color: white;
+        border: none;
+        border-radius: 0.5rem;
+        font-weight: 600;
+        font-size: 1rem;
+        cursor: pointer;
+        transition: transform 0.3s, box-shadow 0.3s;
+    }
+
+    .submit-btn:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 10px 20px rgba(236, 72, 153, 0.4);
+    }
+
+    .form-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 1rem;
+    }
+
+    .form-grid .form-group {
+        grid-column: 1 / -1;
+    }
+
+    .form-grid .form-group:nth-child(3),
+    .form-grid .form-group:nth-child(4) {
+        grid-column: auto;
+    }
+
+    @media (max-width: 600px) {
+        .form-grid {
+            grid-template-columns: 1fr;
+        }
+
+        .form-grid .form-group:nth-child(3),
+        .form-grid .form-group:nth-child(4) {
+            grid-column: 1 / -1;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="auth-container">
+    <div class="auth-card">
+        <h1>✨ Créer un Compte Club</h1>
+        <p>Rejoignez ROBO TUNISIE en 2 minutes</p>
+
+        {% if error %}
+        <div class="error">{{ error }}</div>
+        {% endif %}
+
+        <form method="POST">
+            <div class="form-grid">
+                <div class="form-group">
+                    <label for="name">Nom du club</label>
+                    <input type="text" id="name" name="name" required autofocus>
+                </div>
+
+                <div class="form-group">
+                    <label for="email">Email</label>
+                    <input type="email" id="email" name="email" required>
+                </div>
+
+                <div class="form-group">
+                    <label for="phone">Téléphone</label>
+                    <input type="tel" id="phone" name="phone">
+                </div>
+
+                <div class="form-group">
+                    <label for="city">Ville</label>
+                    <input type="text" id="city" name="city">
+                </div>
+
+                <div class="form-group">
+                    <label for="password">Mot de passe</label>
+                    <input type="password" id="password" name="password" required>
+                </div>
+            </div>
+
+            <button type="submit" class="submit-btn">Créer mon compte</button>
+        </form>
+
+        <div class="auth-link">
+            Vous avez déjà un compte? <a href="/club/login">Se connecter →</a>
+        </div>
+    </div>
+</div>
+{% endblock %}

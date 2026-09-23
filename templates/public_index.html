@@ -1,0 +1,232 @@
+{% extends "base.html" %}
+
+{% block title %}Compétitions de Robotique - ROBO TUNISIE{% endblock %}
+
+{% block extra_css %}
+<style>
+    .hero {
+        background: linear-gradient(135deg, rgba(124, 58, 237, 0.1) 0%, rgba(236, 72, 153, 0.1) 100%);
+        border: 1px solid var(--border-color);
+        border-radius: 1rem;
+        padding: 3rem 2rem;
+        text-align: center;
+        margin-bottom: 2rem;
+        backdrop-filter: blur(10px);
+    }
+
+    .hero h1 {
+        font-family: 'Playfair Display', serif;
+        font-size: 2.5rem;
+        margin-bottom: 0.5rem;
+        background: linear-gradient(135deg, #a78bfa 0%, #f472b6 100%);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+    }
+
+    .hero p {
+        color: var(--text-muted);
+        font-size: 1.1rem;
+    }
+
+    .filters {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+        gap: 1rem;
+        margin-bottom: 2rem;
+        background: rgba(30, 41, 59, 0.4);
+        border: 1px solid var(--border-color);
+        padding: 1.5rem;
+        border-radius: 1rem;
+    }
+
+    .filter-group {
+        display: flex;
+        gap: 0.5rem;
+    }
+
+    .filter-group input,
+    .filter-group select {
+        flex: 1;
+    }
+
+    .filter-group button {
+        padding: 0.75rem 1.5rem;
+    }
+
+    .competitions-table {
+        width: 100%;
+        border-collapse: collapse;
+        background: rgba(30, 41, 59, 0.4);
+        border: 1px solid var(--border-color);
+        border-radius: 1rem;
+        overflow: hidden;
+    }
+
+    .competitions-table thead {
+        background: linear-gradient(135deg, var(--primary-purple) 0%, var(--dark-purple) 100%);
+    }
+
+    .competitions-table th {
+        padding: 1rem;
+        text-align: left;
+        font-weight: 600;
+        color: white;
+        border-bottom: 2px solid var(--accent-pink);
+    }
+
+    .competitions-table td {
+        padding: 1rem;
+        border-bottom: 1px solid var(--border-color);
+    }
+
+    .competitions-table tbody tr {
+        transition: background 0.3s;
+    }
+
+    .competitions-table tbody tr:hover {
+        background: rgba(124, 58, 237, 0.1);
+    }
+
+    .club-badge {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+
+    .date-badge {
+        background: rgba(236, 72, 153, 0.2);
+        color: #f472b6;
+        padding: 0.25rem 0.75rem;
+        border-radius: 0.5rem;
+        font-size: 0.875rem;
+        font-weight: 600;
+        white-space: nowrap;
+    }
+
+    .location-badge {
+        background: rgba(124, 58, 237, 0.2);
+        color: #a78bfa;
+        padding: 0.25rem 0.75rem;
+        border-radius: 0.5rem;
+        font-size: 0.875rem;
+    }
+
+    .view-btn {
+        background: linear-gradient(135deg, var(--primary-purple) 0%, var(--dark-purple) 100%);
+        color: white;
+        padding: 0.5rem 1rem;
+        border: none;
+        border-radius: 0.5rem;
+        cursor: pointer;
+        font-weight: 600;
+        transition: transform 0.3s;
+        text-decoration: none;
+        display: inline-block;
+    }
+
+    .view-btn:hover {
+        transform: translateY(-2px);
+    }
+
+    .empty-state {
+        text-align: center;
+        padding: 3rem;
+        color: var(--text-muted);
+    }
+
+    .empty-state h2 {
+        font-size: 1.5rem;
+        margin-bottom: 0.5rem;
+    }
+
+    @media (max-width: 768px) {
+        .hero h1 {
+            font-size: 1.8rem;
+        }
+
+        .competitions-table {
+            font-size: 0.9rem;
+        }
+
+        .competitions-table th,
+        .competitions-table td {
+            padding: 0.75rem;
+        }
+
+        .view-btn {
+            padding: 0.4rem 0.8rem;
+            font-size: 0.875rem;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="hero">
+    <h1>🤖 Compétitions de Robotique Tunisie</h1>
+    <p>Découvrez les meilleures compétitions de robotique en Tunisie</p>
+</div>
+
+<div class="filters">
+    <div class="filter-group">
+        <form method="GET" style="display: flex; gap: 0.5rem; width: 100%;">
+            <input type="text" name="search" placeholder="Rechercher une compétition..." value="{{ search }}">
+            <button type="submit" class="btn">Rechercher</button>
+        </form>
+    </div>
+
+    {% if location_filter or search %}
+    <div style="text-align: right;">
+        <a href="/" class="btn btn-secondary">Réinitialiser filtres</a>
+    </div>
+    {% endif %}
+</div>
+
+{% if competitions %}
+<div class="container" style="padding: 0; border: none; background: none;">
+    <table class="competitions-table">
+        <thead>
+            <tr>
+                <th style="width: 25%;">Compétition</th>
+                <th style="width: 15%;">Date</th>
+                <th style="width: 20%;">Lieu</th>
+                <th style="width: 20%;">Club Organisateur</th>
+                <th style="width: 20%;">Action</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for comp in competitions %}
+            <tr>
+                <td>
+                    <strong>{{ comp.name }}</strong>
+                </td>
+                <td>
+                    <span class="date-badge">{{ comp.date }}</span>
+                </td>
+                <td>
+                    <span class="location-badge">{{ comp.location }}</span>
+                </td>
+                <td>
+                    <div class="club-badge">
+                        <span>{{ comp.club_name }}</span>
+                        {% if comp.facebook %}
+                            <a href="{{ comp.facebook }}" target="_blank" style="color: #a78bfa; font-size: 1.2rem;">f</a>
+                        {% endif %}
+                    </div>
+                </td>
+                <td>
+                    <a href="/competition/{{ comp.id }}" class="view-btn">Détails →</a>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% else %}
+<div class="empty-state">
+    <h2>😔 Aucune compétition trouvée</h2>
+    <p>{% if search or location_filter %}Essayez de modifier vos filtres{% else %}Revenez bientôt pour voir les compétitions!{% endif %}</p>
+</div>
+{% endif %}
+{% endblock %}

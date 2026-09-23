@@ -1,0 +1,364 @@
+{% extends "base.html" %}
+
+{% block title %}{{ competition.name }} - ROBO TUNISIE{% endblock %}
+
+{% block extra_css %}
+<style>
+    .back-link {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+        color: var(--light-pink);
+        text-decoration: none;
+        margin-bottom: 1.5rem;
+        font-weight: 500;
+        transition: gap 0.3s;
+    }
+
+    .back-link:hover {
+        gap: 1rem;
+    }
+
+    .comp-header {
+        background: linear-gradient(135deg, rgba(124, 58, 237, 0.1) 0%, rgba(236, 72, 153, 0.1) 100%);
+        border: 1px solid var(--border-color);
+        padding: 2rem;
+        border-radius: 1rem;
+        margin-bottom: 2rem;
+    }
+
+    .comp-header h1 {
+        font-family: 'Playfair Display', serif;
+        font-size: 2rem;
+        margin-bottom: 1rem;
+        background: linear-gradient(135deg, #a78bfa 0%, #f472b6 100%);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+    }
+
+    .comp-meta {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 1.5rem;
+        margin-top: 1.5rem;
+    }
+
+    .meta-item {
+        display: flex;
+        flex-direction: column;
+        gap: 0.3rem;
+    }
+
+    .meta-label {
+        color: var(--text-muted);
+        font-size: 0.875rem;
+        text-transform: uppercase;
+        font-weight: 600;
+        letter-spacing: 0.05em;
+    }
+
+    .meta-value {
+        font-size: 1.1rem;
+        font-weight: 500;
+        color: var(--text-light);
+    }
+
+    .meta-value.date {
+        color: #f472b6;
+    }
+
+    .meta-value.location {
+        color: #a78bfa;
+    }
+
+    .content-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 2rem;
+        margin-bottom: 2rem;
+    }
+
+    .section {
+        background: rgba(30, 41, 59, 0.6);
+        border: 1px solid var(--border-color);
+        padding: 1.5rem;
+        border-radius: 1rem;
+    }
+
+    .section h2 {
+        font-family: 'Playfair Display', serif;
+        font-size: 1.5rem;
+        margin-bottom: 1rem;
+        color: #a78bfa;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+
+    .section h3 {
+        font-size: 1.1rem;
+        margin-top: 1rem;
+        margin-bottom: 0.5rem;
+        color: #f472b6;
+    }
+
+    .section p {
+        color: var(--text-muted);
+        line-height: 1.6;
+        margin-bottom: 1rem;
+    }
+
+    .documents-list {
+        list-style: none;
+    }
+
+    .documents-list li {
+        background: rgba(0, 0, 0, 0.2);
+        padding: 1rem;
+        border-radius: 0.5rem;
+        margin-bottom: 0.5rem;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        border-left: 3px solid var(--accent-pink);
+    }
+
+    .documents-list a {
+        color: var(--light-pink);
+        text-decoration: none;
+        font-weight: 600;
+        transition: color 0.3s;
+    }
+
+    .documents-list a:hover {
+        color: #f472b6;
+    }
+
+    .doc-icon {
+        width: 40px;
+        height: 40px;
+        background: rgba(236, 72, 153, 0.1);
+        border-radius: 0.5rem;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.2rem;
+    }
+
+    .socials-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+        gap: 1rem;
+    }
+
+    .social-btn {
+        background: rgba(124, 58, 237, 0.2);
+        border: 1px solid var(--primary-purple);
+        color: #a78bfa;
+        padding: 1rem;
+        border-radius: 0.75rem;
+        text-decoration: none;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 0.5rem;
+        font-weight: 600;
+        transition: all 0.3s;
+    }
+
+    .social-btn:hover {
+        background: rgba(124, 58, 237, 0.3);
+        border-color: var(--light-pink);
+        color: #f472b6;
+        transform: translateY(-2px);
+    }
+
+    .contact-info {
+        background: rgba(236, 72, 153, 0.1);
+        border-left: 3px solid var(--accent-pink);
+        padding: 1rem;
+        border-radius: 0.5rem;
+        margin-top: 1rem;
+    }
+
+    .contact-info a {
+        color: var(--light-pink);
+        text-decoration: none;
+    }
+
+    .contact-info a:hover {
+        text-decoration: underline;
+    }
+
+    .register-btn {
+        width: 100%;
+        padding: 1rem;
+        background: linear-gradient(135deg, var(--accent-pink) 0%, #f472b6 100%);
+        color: white;
+        border: none;
+        border-radius: 0.75rem;
+        font-weight: 700;
+        font-size: 1.1rem;
+        cursor: pointer;
+        transition: transform 0.3s, box-shadow 0.3s;
+        margin-top: 1rem;
+    }
+
+    .register-btn:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 10px 30px rgba(236, 72, 153, 0.4);
+    }
+
+    .empty-message {
+        color: var(--text-muted);
+        font-style: italic;
+        text-align: center;
+        padding: 1rem;
+        background: rgba(0, 0, 0, 0.2);
+        border-radius: 0.5rem;
+    }
+
+    @media (max-width: 768px) {
+        .content-grid {
+            grid-template-columns: 1fr;
+        }
+
+        .comp-header h1 {
+            font-size: 1.5rem;
+        }
+
+        .comp-meta {
+            grid-template-columns: 1fr;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<a href="/" class="back-link">← Retour aux compétitions</a>
+
+<div class="comp-header">
+    <h1>{{ competition.name }}</h1>
+    
+    <div class="comp-meta">
+        <div class="meta-item">
+            <span class="meta-label">📅 Date</span>
+            <span class="meta-value date">{{ competition.date }}</span>
+        </div>
+        <div class="meta-item">
+            <span class="meta-label">📍 Lieu</span>
+            <span class="meta-value location">{{ competition.location }}</span>
+        </div>
+        <div class="meta-item">
+            <span class="meta-label">🏛️ Club Organisateur</span>
+            <span class="meta-value">{{ competition.club_name }}</span>
+        </div>
+        {% if competition.registration_deadline %}
+        <div class="meta-item">
+            <span class="meta-label">⏰ Limite d'inscription</span>
+            <span class="meta-value">{{ competition.registration_deadline }}</span>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<div class="content-grid">
+    <!-- Section Informations -->
+    <div class="section">
+        <h2>📋 Informations</h2>
+        
+        {% if competition.description %}
+        <div>
+            <h3>Description</h3>
+            <p>{{ competition.description }}</p>
+        </div>
+        {% endif %}
+
+        {% if competition.challenges %}
+        <div>
+            <h3>Défis & Challenges</h3>
+            <p>{{ competition.challenges }}</p>
+        </div>
+        {% endif %}
+
+        {% if competition.max_participants %}
+        <div>
+            <h3>Nombre de participants</h3>
+            <p>Maximum: <strong>{{ competition.max_participants }}</strong> équipes</p>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Section Ressources & Contact -->
+    <div class="section">
+        <h2>📚 Ressources</h2>
+        
+        {% if documents %}
+        <div>
+            <h3>Cahiers de Charges</h3>
+            <ul class="documents-list">
+                {% for doc in documents %}
+                <li>
+                    <div style="display: flex; gap: 1rem; align-items: center; flex: 1;">
+                        <div class="doc-icon">
+                            {% if doc.file_type == 'pdf' %}📄{% elif doc.file_type in ['doc', 'docx'] %}📝{% else %}📋{% endif %}
+                        </div>
+                        <a href="/downloads/{{ doc.file_path }}" download>{{ doc.title }}</a>
+                    </div>
+                    <span style="color: var(--text-muted); font-size: 0.875rem;">{{ doc.file_type|upper }}</span>
+                </li>
+                {% endfor %}
+            </ul>
+        </div>
+        {% else %}
+        <div class="empty-message">
+            Aucun document disponible pour le moment
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Section Réseaux Sociaux & Contact -->
+<div class="section">
+    <h2>🌐 Réseaux & Contact</h2>
+    
+    {% if socials %}
+    <h3>Suivez le Club</h3>
+    <div class="socials-grid">
+        {% for social in socials %}
+        <a href="{{ social.url }}" target="_blank" class="social-btn">
+            {% if 'facebook' in social.platform.lower() %}👤 Facebook
+            {% elif 'instagram' in social.platform.lower() %}📸 Instagram
+            {% elif 'linkedin' in social.platform.lower() %}💼 LinkedIn
+            {% elif 'twitter' in social.platform.lower() %}🐦 Twitter
+            {% else %}{{ social.platform }}
+            {% endif %}
+        </a>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    {% if competition.contact_email or competition.contact_phone %}
+    <div class="contact-info">
+        <h3 style="color: #f472b6; margin-bottom: 0.5rem;">Contactez-nous</h3>
+        {% if competition.contact_email %}
+        <p>
+            <strong>Email:</strong> 
+            <a href="mailto:{{ competition.contact_email }}">{{ competition.contact_email }}</a>
+        </p>
+        {% endif %}
+        {% if competition.contact_phone %}
+        <p>
+            <strong>Téléphone:</strong> 
+            <a href="tel:{{ competition.contact_phone }}">{{ competition.contact_phone }}</a>
+        </p>
+        {% endif %}
+    </div>
+    {% endif %}
+
+    <button class="register-btn" onclick="alert('Fonctionnalité d\'inscription à venir!')">
+        📝 S'inscrire à cette compétition
+    </button>
+</div>
+{% endblock %}

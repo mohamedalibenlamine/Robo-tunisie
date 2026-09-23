@@ -1,0 +1,220 @@
+{% extends "base.html" %}
+
+{% block title %}Créer une Compétition - ROBO TUNISIE{% endblock %}
+
+{% block extra_css %}
+<style>
+    .page-title {
+        font-family: 'Playfair Display', serif;
+        font-size: 2rem;
+        margin-bottom: 2rem;
+        background: linear-gradient(135deg, #a78bfa 0%, #f472b6 100%);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+    }
+
+    .form-container {
+        max-width: 800px;
+        background: rgba(30, 41, 59, 0.6);
+        border: 1px solid var(--border-color);
+        padding: 2rem;
+        border-radius: 1rem;
+        backdrop-filter: blur(10px);
+    }
+
+    .form-section {
+        margin-bottom: 2rem;
+        padding-bottom: 2rem;
+        border-bottom: 1px solid var(--border-color);
+    }
+
+    .form-section:last-of-type {
+        border-bottom: none;
+        margin-bottom: 1rem;
+    }
+
+    .section-title {
+        font-size: 1.2rem;
+        color: #a78bfa;
+        margin-bottom: 1rem;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+
+    .form-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 1.5rem;
+    }
+
+    .form-grid .form-group {
+        grid-column: 1 / -1;
+    }
+
+    .form-grid .form-group:nth-child(1),
+    .form-grid .form-group:nth-child(2) {
+        grid-column: auto;
+    }
+
+    .form-grid .form-group:nth-child(3),
+    .form-grid .form-group:nth-child(4) {
+        grid-column: auto;
+    }
+
+    .form-group input,
+    .form-group textarea {
+        width: 100%;
+    }
+
+    .form-actions {
+        display: flex;
+        gap: 1rem;
+        justify-content: space-between;
+    }
+
+    .submit-btn {
+        background: linear-gradient(135deg, var(--accent-pink) 0%, #f472b6 100%);
+        color: white;
+        padding: 0.75rem 2rem;
+        border: none;
+        border-radius: 0.5rem;
+        font-weight: 600;
+        font-size: 1rem;
+        cursor: pointer;
+        transition: transform 0.3s, box-shadow 0.3s;
+    }
+
+    .submit-btn:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 10px 20px rgba(236, 72, 153, 0.4);
+    }
+
+    .cancel-btn {
+        background: transparent;
+        color: var(--text-muted);
+        padding: 0.75rem 2rem;
+        border: 1px solid var(--border-color);
+        border-radius: 0.5rem;
+        font-weight: 600;
+        cursor: pointer;
+        text-decoration: none;
+        text-align: center;
+        transition: all 0.3s;
+    }
+
+    .cancel-btn:hover {
+        border-color: var(--text-light);
+        color: var(--text-light);
+    }
+
+    @media (max-width: 768px) {
+        .form-grid {
+            grid-template-columns: 1fr;
+        }
+
+        .form-grid .form-group {
+            grid-column: 1 / -1;
+        }
+
+        .form-actions {
+            flex-direction: column;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<h1 class="page-title">✨ Créer une Nouvelle Compétition</h1>
+
+{% if error %}
+<div class="error">{{ error }}</div>
+{% endif %}
+
+<div class="form-container">
+    <form method="POST">
+        <!-- Informations Générales -->
+        <div class="form-section">
+            <h2 class="section-title">📋 Informations Générales</h2>
+            
+            <div class="form-grid">
+                <div class="form-group">
+                    <label for="name">Nom de la compétition *</label>
+                    <input type="text" id="name" name="name" required placeholder="ex: EPI Robots Day 5.0">
+                </div>
+
+                <div class="form-group">
+                    <label for="date">Date *</label>
+                    <input type="date" id="date" name="date" required>
+                </div>
+
+                <div class="form-group">
+                    <label for="location">Lieu *</label>
+                    <input type="text" id="location" name="location" required placeholder="ex: École Polytechnique de Tunisie">
+                </div>
+
+                <div class="form-group">
+                    <label for="registration_deadline">Limite d'inscription</label>
+                    <input type="date" id="registration_deadline" name="registration_deadline">
+                </div>
+            </div>
+        </div>
+
+        <!-- Description et Défis -->
+        <div class="form-section">
+            <h2 class="section-title">🎯 Description et Défis</h2>
+            
+            <div class="form-group">
+                <label for="description">Description de la compétition</label>
+                <textarea id="description" name="description" placeholder="Décrivez votre compétition, l'atmosphère, les objectifs..."></textarea>
+            </div>
+
+            <div class="form-group">
+                <label for="challenges">Défis et Challenges</label>
+                <textarea id="challenges" name="challenges" placeholder="Listez les défis, les épreuves, les règles principales..."></textarea>
+            </div>
+        </div>
+
+        <!-- Paramètres Techniques -->
+        <div class="form-section">
+            <h2 class="section-title">⚙️ Paramètres Techniques</h2>
+            
+            <div class="form-grid">
+                <div class="form-group">
+                    <label for="max_participants">Nombre max de participants</label>
+                    <input type="number" id="max_participants" name="max_participants" min="0" placeholder="ex: 50">
+                </div>
+
+                <div class="form-group">
+                    <label for="website">Site web de la compétition</label>
+                    <input type="url" id="website" name="website" placeholder="https://...">
+                </div>
+            </div>
+        </div>
+
+        <!-- Contact -->
+        <div class="form-section">
+            <h2 class="section-title">📞 Informations de Contact</h2>
+            
+            <div class="form-grid">
+                <div class="form-group">
+                    <label for="contact_email">Email de contact *</label>
+                    <input type="email" id="contact_email" name="contact_email" required placeholder="contact@votreclub.tn">
+                </div>
+
+                <div class="form-group">
+                    <label for="contact_phone">Téléphone</label>
+                    <input type="tel" id="contact_phone" name="contact_phone" placeholder="+216 XX XXX XXX">
+                </div>
+            </div>
+        </div>
+
+        <!-- Actions -->
+        <div class="form-actions">
+            <a href="/club/dashboard" class="cancel-btn">Annuler</a>
+            <button type="submit" class="submit-btn">Créer la compétition →</button>
+        </div>
+    </form>
+</div>
+{% endblock %}
