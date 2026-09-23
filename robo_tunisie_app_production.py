@@ -1,7 +1,9 @@
 from flask import Flask, render_template, request, jsonify, session, redirect, url_for, send_from_directory
 from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import secure_filename
-import sqlite3
+import psycopg
+from psycopg.rows import dict_row
+from psycopg import IntegrityError
 import os
 from datetime import datetime
 from functools import wraps
@@ -20,76 +22,64 @@ app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max
 
 # Database path (Support Render persistent volume)
-DB_PATH = os.environ.get('DB_PATH', 'robo_tunisie.db')
+DATABASE_URL = os.environ.get('DATABASE_URL')
+if not DATABASE_URL:
+    raise RuntimeError('DATABASE_URL environment variable is required for PostgreSQL')
 
 # Database initialization
 def init_db():
-    conn = sqlite3.connect(DB_PATH)
-    c = conn.cursor()
-    
-    # Table clubs
-    c.execute('''CREATE TABLE IF NOT EXISTS clubs (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        name TEXT NOT NULL UNIQUE,
-        email TEXT NOT NULL UNIQUE,
-        password TEXT NOT NULL,
-        phone TEXT,
-        city TEXT,
-        facebook TEXT,
-        instagram TEXT,
-        linkedin TEXT,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-    )''')
-    
-    # Table competitions
-    c.execute('''CREATE TABLE IF NOT EXISTS competitions (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        club_id INTEGER NOT NULL,
-        name TEXT NOT NULL,
-        date TEXT NOT NULL,
-        location TEXT NOT NULL,
-        description TEXT,
-        challenges TEXT,
-        max_participants INTEGER,
-        registration_deadline TEXT,
-        website TEXT,
-        contact_email TEXT,
-        contact_phone TEXT,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        FOREIGN KEY (club_id) REFERENCES clubs(id)
-    )''')
-    
-    # Table documents (cahiers de charges)
-    c.execute('''CREATE TABLE IF NOT EXISTS documents (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        competition_id INTEGER NOT NULL,
-        title TEXT NOT NULL,
-        file_path TEXT NOT NULL,
-        file_type TEXT,
-        upload_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        FOREIGN KEY (competition_id) REFERENCES competitions(id)
-    )''')
-    
-    # Table social links
-    c.execute('''CREATE TABLE IF NOT EXISTS social_links (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        competition_id INTEGER NOT NULL,
-        platform TEXT NOT NULL,
-        url TEXT NOT NULL,
-        FOREIGN KEY (competition_id) REFERENCES competitions(id)
-    )''')
-    
-    conn.commit()
-    conn.close()
+    """Créer les tables PostgreSQL si elles n'existent pas"""
+    with get_db() as conn:
+        with conn.cursor() as c:
+            c.execute('''CREATE TABLE IF NOT EXISTS clubs (
+                id BIGSERIAL PRIMARY KEY,
+                name TEXT NOT NULL UNIQUE,
+                email TEXT NOT NULL UNIQUE,
+                password TEXT NOT NULL,
+                phone TEXT,
+                city TEXT,
+                facebook TEXT,
+                instagram TEXT,
+                linkedin TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )''')
+            c.execute('''CREATE TABLE IF NOT EXISTS competitions (
+                id BIGSERIAL PRIMARY KEY,
+                club_id BIGINT NOT NULL REFERENCES clubs(id),
+                name TEXT NOT NULL,
+                date TEXT NOT NULL,
+                location TEXT NOT NULL,
+                description TEXT,
+                challenges TEXT,
+                max_participants INTEGER,
+                registration_deadline TEXT,
+                website TEXT,
+                contact_email TEXT,
+                contact_phone TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )''')
+            c.execute('''CREATE TABLE IF NOT EXISTS documents (
+                id BIGSERIAL PRIMARY KEY,
+                competition_id BIGINT NOT NULL REFERENCES competitions(id) ON DELETE CASCADE,
+                title TEXT NOT NULL,
+                file_path TEXT NOT NULL,
+                file_type TEXT,
+                upload_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )''')
+            c.execute('''CREATE TABLE IF NOT EXISTS social_links (
+                id BIGSERIAL PRIMARY KEY,
+                competition_id BIGINT NOT NULL REFERENCES competitions(id) ON DELETE CASCADE,
+                platform TEXT NOT NULL,
+                url TEXT NOT NULL
+            )''')
 
 # Helper functions
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
 def get_db():
-    conn = sqlite3.connect(DB_PATH)
-    conn.row_factory = sqlite3.Row
-    return conn
+    return psycopg.connect(DATABASE_URL, row_factory=dict_row, connect_timeout=15)
+
 
 def login_required_club(f):
     @wraps(f)
@@ -145,7 +135,7 @@ def competition_detail(competition_id):
         SELECT c.*, cl.name as club_name, cl.facebook, cl.instagram, cl.linkedin, cl.phone, cl.email
         FROM competitions c
         JOIN clubs cl ON c.club_id = cl.id
-        WHERE c.id = ?
+        WHERE c.id = %s
     ''', (competition_id,)).fetchone()
     
     if not comp:
@@ -154,13 +144,13 @@ def competition_detail(competition_id):
     
     # Documents
     documents = conn.execute(
-        'SELECT * FROM documents WHERE competition_id = ? ORDER BY upload_date DESC',
+        'SELECT * FROM documents WHERE competition_id = %s ORDER BY upload_date DESC',
         (competition_id,)
     ).fetchall()
     
     # Social links
     socials = conn.execute(
-        'SELECT platform, url FROM social_links WHERE competition_id = ?',
+        'SELECT platform, url FROM social_links WHERE competition_id = %s',
         (competition_id,)
     ).fetchall()
     
@@ -186,7 +176,7 @@ def club_login():
         password = request.form.get('password')
         
         conn = get_db()
-        club = conn.execute('SELECT * FROM clubs WHERE email = ?', (email,)).fetchone()
+        club = conn.execute('SELECT * FROM clubs WHERE email = %s', (email,)).fetchone()
         conn.close()
         
         if club and check_password_hash(club['password'], password):
@@ -212,7 +202,7 @@ def club_register():
         conn = get_db()
         
         # Vérifier doublon
-        existing = conn.execute('SELECT * FROM clubs WHERE email = ? OR name = ?', 
+        existing = conn.execute('SELECT * FROM clubs WHERE email = %s OR name = %s', 
                                (email, name)).fetchone()
         if existing:
             conn.close()
@@ -222,13 +212,13 @@ def club_register():
         # Créer le club
         try:
             conn.execute('''INSERT INTO clubs (name, email, password, phone, city)
-                           VALUES (?, ?, ?, ?, ?)''',
+                           VALUES (%s, %s, %s, %s, %s)''',
                         (name, email, generate_password_hash(password), phone, city))
             conn.commit()
             conn.close()
             
             # Auto-login
-            club = get_db().execute('SELECT id FROM clubs WHERE email = ?', (email,)).fetchone()
+            club = get_db().execute('SELECT id FROM clubs WHERE email = %s', (email,)).fetchone()
             session['club_id'] = club['id']
             session['club_name'] = name
             session['club_email'] = email
@@ -254,7 +244,7 @@ def club_dashboard():
     conn = get_db()
     
     competitions = conn.execute('''
-        SELECT * FROM competitions WHERE club_id = ? ORDER BY date DESC
+        SELECT * FROM competitions WHERE club_id = %s ORDER BY date DESC
     ''', (session['club_id'],)).fetchall()
     
     conn.close()
@@ -283,12 +273,12 @@ def new_competition():
                 INSERT INTO competitions 
                 (club_id, name, date, location, description, challenges, 
                  max_participants, registration_deadline, contact_email, contact_phone)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
             ''', (session['club_id'], name, date, location, description, challenges,
                   max_participants, registration_deadline, contact_email, contact_phone))
             
             conn.commit()
-            competition_id = cursor.lastrowid
+            competition_id = cursor.fetchone()['id']
             conn.close()
             
             return redirect(url_for('edit_competition', competition_id=competition_id))
@@ -305,7 +295,7 @@ def edit_competition(competition_id):
     conn = get_db()
     
     comp = conn.execute('''
-        SELECT * FROM competitions WHERE id = ? AND club_id = ?
+        SELECT * FROM competitions WHERE id = %s AND club_id = %s
     ''', (competition_id, session['club_id'])).fetchone()
     
     if not comp:
@@ -326,9 +316,9 @@ def edit_competition(competition_id):
         try:
             conn.execute('''
                 UPDATE competitions 
-                SET name=?, date=?, location=?, description=?, challenges=?,
-                    max_participants=?, registration_deadline=?, contact_email=?, contact_phone=?
-                WHERE id = ?
+                SET name=%s, date=%s, location=%s, description=%s, challenges=%s,
+                    max_participants=%s, registration_deadline=%s, contact_email=%s, contact_phone=%s
+                WHERE id = %s
             ''', (name, date, location, description, challenges,
                   max_participants, registration_deadline, contact_email, contact_phone, competition_id))
             
@@ -343,11 +333,11 @@ def edit_competition(competition_id):
     
     # Documents et réseaux
     documents = conn.execute(
-        'SELECT * FROM documents WHERE competition_id = ?', (competition_id,)
+        'SELECT * FROM documents WHERE competition_id = %s', (competition_id,)
     ).fetchall()
     
     socials = conn.execute(
-        'SELECT * FROM social_links WHERE competition_id = ?', (competition_id,)
+        'SELECT * FROM social_links WHERE competition_id = %s', (competition_id,)
     ).fetchall()
     
     conn.close()
@@ -368,7 +358,7 @@ def upload_document(competition_id):
     
     # Vérifier ownership
     comp = conn.execute(
-        'SELECT club_id FROM competitions WHERE id = ?', (competition_id,)
+        'SELECT club_id FROM competitions WHERE id = %s', (competition_id,)
     ).fetchone()
     
     if not comp or comp['club_id'] != session['club_id']:
@@ -393,7 +383,7 @@ def upload_document(competition_id):
     
     conn.execute('''
         INSERT INTO documents (competition_id, title, file_path, file_type)
-        VALUES (?, ?, ?, ?)
+        VALUES (%s, %s, %s, %s)
     ''', (competition_id, title, filename, file.filename.rsplit('.', 1)[1].lower()))
     
     conn.commit()
@@ -407,7 +397,7 @@ def delete_document(doc_id):
     """Supprimer un document"""
     conn = get_db()
     
-    doc = conn.execute('SELECT d.*, c.club_id FROM documents d JOIN competitions c ON d.competition_id = c.id WHERE d.id = ?', (doc_id,)).fetchone()
+    doc = conn.execute('SELECT d.*, c.club_id FROM documents d JOIN competitions c ON d.competition_id = c.id WHERE d.id = %s', (doc_id,)).fetchone()
     
     if not doc or doc['club_id'] != session['club_id']:
         conn.close()
@@ -418,7 +408,7 @@ def delete_document(doc_id):
     if os.path.exists(filepath):
         os.remove(filepath)
     
-    conn.execute('DELETE FROM documents WHERE id = ?', (doc_id,))
+    conn.execute('DELETE FROM documents WHERE id = %s', (doc_id,))
     conn.commit()
     conn.close()
     
@@ -431,7 +421,7 @@ def add_social(competition_id):
     conn = get_db()
     
     comp = conn.execute(
-        'SELECT club_id FROM competitions WHERE id = ?', (competition_id,)
+        'SELECT club_id FROM competitions WHERE id = %s', (competition_id,)
     ).fetchone()
     
     if not comp or comp['club_id'] != session['club_id']:
@@ -443,7 +433,7 @@ def add_social(competition_id):
     
     conn.execute('''
         INSERT INTO social_links (competition_id, platform, url)
-        VALUES (?, ?, ?)
+        VALUES (%s, %s, %s)
     ''', (competition_id, platform, url))
     
     conn.commit()
@@ -457,13 +447,13 @@ def delete_social(social_id):
     """Supprimer un lien réseaux"""
     conn = get_db()
     
-    social = conn.execute('SELECT s.*, c.club_id FROM social_links s JOIN competitions c ON s.competition_id = c.id WHERE s.id = ?', (social_id,)).fetchone()
+    social = conn.execute('SELECT s.*, c.club_id FROM social_links s JOIN competitions c ON s.competition_id = c.id WHERE s.id = %s', (social_id,)).fetchone()
     
     if not social or social['club_id'] != session['club_id']:
         conn.close()
         return jsonify({'error': 'Non autorisé'}), 403
     
-    conn.execute('DELETE FROM social_links WHERE id = ?', (social_id,))
+    conn.execute('DELETE FROM social_links WHERE id = %s', (social_id,))
     conn.commit()
     conn.close()
     
